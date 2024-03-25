@@ -2,6 +2,8 @@ import os
 import cv2
 import imutils as imu
 import numpy as np
+import pytesseract
+import skimage.segmentation
 
 def ShowImage(name,img):
     cv2.imshow(f'{name}',img)
@@ -24,10 +26,11 @@ for nameOfImage in listOfPictures:
 
     gray = cv2.filter2D(gray,-1,sharpen)
 
-    rectangleKernel = cv2.getStructuringElement(cv2.MORPH_RECT, (25,13))
+    rectangleKernel = cv2.getStructuringElement(cv2.MORPH_RECT, (19
+                                                                 ,13))
     blackHat = cv2.morphologyEx(gray,cv2.MORPH_BLACKHAT,rectangleKernel)
     ShowImage(nameOfImage,blackHat)
-
+    ShowImage(nameOfImage,gray)
     squareKernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3,3))
     light = cv2.morphologyEx(gray,cv2.MORPH_CLOSE,squareKernel)
     light = cv2.threshold(light,0,255,cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
@@ -50,9 +53,6 @@ for nameOfImage in listOfPictures:
 
     thresh = cv2.erode(thresh,None,iterations=4)
     thresh = cv2.dilate(thresh,None,iterations=6)
-    thresh = cv2.erode(thresh,None,iterations=3)
-    thresh = cv2.dilate(thresh,None,iterations=3)
-    #ShowImage(nameOfImage,thresh)
     cv2.imshow(nameOfImage,thresh)
     cv2.imshow('light',light)
     cv2.waitKey(0)
@@ -73,15 +73,22 @@ for nameOfImage in listOfPictures:
     roi = None
 
     for c in cnts:
-        (x,y,w,h) = cv2.boundingRect(c)
-        ar = w/float(h)
 
-        lpCnt = c
-        plate = gray[y:y+h,x:x+w]
-        roi = cv2.threshold(plate,0,255,cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
-        cv2.imshow("Plate",plate)
-        cv2.imshow('roi',roi)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+        (x,y,w,h) = cv2.boundingRect(c)
+        if w >= 60 and w <= 250:
+            lpCnt = c
+            plate = gray[y:y + h, x:x + w]
+            roi = cv2.threshold(plate, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
+            cv2.imshow("Plate", plate)
+            cv2.imshow('roi', roi)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
+            pytesseract.pytesseract.tesseract_cmd="C:\\Program Files\\Tesseract-OCR\\tesseract.exe"
+            text = pytesseract.image_to_string(roi, config=r'--psm 7 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ')
+            # Wyświetlenie tekstu
+
+            if len(text) >=6:
+                print(text)
+
 
 
