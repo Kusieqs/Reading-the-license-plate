@@ -2,13 +2,13 @@ import os
 import cv2
 import imutils as imu
 import numpy as np
-import pytesseract
-import skimage.segmentation
+import easyocr
 
-def ShowImage(name,img):
-    cv2.imshow(f'{name}',img)
+def ShowImage(name,img): #Additional method to show image (You have to remove code from 30 - 37)
+    cv2.imshow(name, img)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
+
 
 def PrintingPlate(cnts, gray):
     for k in cnts:
@@ -17,35 +17,32 @@ def PrintingPlate(cnts, gray):
         if w >= 60 and w <= 350:
 
             plate = gray[y:y + h, x:x + w]
+            plate = imu.resize(plate, width=350)
+            plate = cv2.medianBlur(plate, 3)
             roi = cv2.threshold(plate, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
-            roi = imu.resize(roi, width=350)
-            roi = cv2.erode(roi, None, iterations= 2)
-            roi = cv2.dilate(roi, None, iterations = 3)
-            pytesseract.pytesseract.tesseract_cmd="C:\\Program Files\\Tesseract-OCR\\tesseract.exe"
-            text = pytesseract.image_to_string(roi, config=r'--psm 7 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ')
+            roi = cv2.dilate(roi, None, iterations = 2)
+            roi = cv2.erode(roi, None, iterations= 3)
+            roi = cv2.dilate(roi, None, iterations = 1)
 
-            if len(text) >=6:
-                print(text)
-                cv2.imshow("Plate", plate)
-                cv2.imshow('roi', roi)
-                cv2.waitKey(0)
-                cv2.destroyAllWindows()
+            reader = easyocr.Reader(['en'])
+            result = reader.readtext(roi, allowlist='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789')
+
+            for detection in result:
+
+                text = detection[1]
+
+                if len(text) >=4:
+                    print(text.upper())
 def ErodeDilate(thresh,light):
-    thresh = cv2.erode(thresh,None,iterations=3)
-    thresh = cv2.dilate(thresh,None,iterations=5)
-    ShowImage("1",thresh)
-    ShowImage("light",light)
-    thresh = cv2.bitwise_and(thresh,thresh,mask=light)
-    thresh = cv2.dilate(thresh, None, iterations=5)
-    thresh = cv2.erode(thresh,None,iterations=7)
-    thresh = cv2.dilate(thresh, None, iterations=7)
-    thresh = cv2.erode(thresh,None,iterations=3)
-    ShowImage("2",thresh)
-    return thresh
+    newthresh = cv2.bitwise_and(thresh,thresh,mask=light)
+    newthresh = cv2.dilate(newthresh,None,iterations=3)
+    newthresh = cv2.erode(newthresh,None,iterations=5)
+    newthresh = cv2.dilate(newthresh,None,iterations=6)
+    newthresh = cv2.erode(newthresh, None, iterations=4)
+    newthresh = cv2.dilate(newthresh,None,iterations=2)
+    return newthresh
 
-def SetCandidates(nameOfImage, img, numb):
-
-    ShowImage(nameOfImage,img)
+def SetCandidates(nameOfImage, img):
 
     # Resizes the image to a width of 600px, Convert the resized image to grayscale, Applies a sharpening filter to the grayscale
     img = imu.resize(img, width=600)
@@ -58,7 +55,7 @@ def SetCandidates(nameOfImage, img, numb):
     sharp = cv2.filter2D(gray, -1 , sharpen)
 
     # Morphological blackhat operation
-    rectangleKernel = cv2.getStructuringElement(cv2.MORPH_RECT, (17,13))
+    rectangleKernel = cv2.getStructuringElement(cv2.MORPH_RECT, (21,13))
     blackHat = cv2.morphologyEx(sharp,cv2.MORPH_BLACKHAT,rectangleKernel)
 
     # Closing morphology operation.
@@ -69,7 +66,7 @@ def SetCandidates(nameOfImage, img, numb):
     light = cv2.threshold(light,0,255,cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
     light = cv2.dilate(light,None,iterations=3)
     light = cv2.erode(light,None,iterations=3)
-    ShowImage('Thresholding after erode and dilate',light)
+    light = cv2.dilate(light,None,iterations=1)
 
     # Calculates horizontal gradient, normalizes values, and converts to uint8 data type.
     gradX = cv2.Sobel(blackHat,ddepth=cv2.CV_32F,dx=1,dy=0,ksize=-1)
@@ -77,7 +74,6 @@ def SetCandidates(nameOfImage, img, numb):
     (minVal, maxVal) = (np.min(gradX),np.max(gradX))
     gradX = 255*((gradX - minVal)/(maxVal - gradX))
     gradX = gradX.astype("uint8")
-    ShowImage("gradX",gradX)
 
     # Blur
     gradX = cv2.GaussianBlur(gradX,(3,3),0)
@@ -86,7 +82,6 @@ def SetCandidates(nameOfImage, img, numb):
 
     # Eroding and dilating
     thresh = ErodeDilate(thresh,light)
-    ShowImage(nameOfImage,thresh)
 
     # Creating list of candidates
     cnts = cv2.findContours(thresh.copy(),cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -96,14 +91,22 @@ def SetCandidates(nameOfImage, img, numb):
 
 
 
-listOfPictures = os.listdir('cars')
-choose = 0
+listOfPicturesCars = os.listdir('cars')
 
-
-for nameOfImage in listOfPictures:
+for nameOfImage in listOfPicturesCars:
     img = cv2.imread('cars//' + nameOfImage)
-    (cnts, gray) = SetCandidates(nameOfImage,img,choose)
+    (cnts, gray) = SetCandidates(nameOfImage,img)
     PrintingPlate(cnts,gray)
+
+
+
+listOfPicturesCars = os.listdir('cars1')
+
+for nameOfImage in listOfPicturesCars:
+    img = cv2.imread('cars1//' + nameOfImage)
+    (cnts, gray) = SetCandidates(nameOfImage,img)
+    PrintingPlate(cnts,gray)
+
 
 
 
