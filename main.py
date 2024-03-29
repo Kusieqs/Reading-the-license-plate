@@ -13,7 +13,6 @@ def ShowImage(name,img): #Additional method to show image (You have to remove co
 def PrintingPlate(cnts, gray):
     for k in cnts:
         (x,y,w,h) = cv2.boundingRect(k)
-        ar = w/float(h)
 
         if w >= 60 and w <= 350:
 
